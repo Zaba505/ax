@@ -5,27 +5,31 @@ use crate as ax;
 
 /// This AI uses the Negamax algorithm to determine its moves.
 #[derive(Debug)]
-pub struct Negamax<P, S, F>
+pub struct Negamax<P, E, S, F>
 where
     P: fmt::Display + PartialEq + Default + Copy,
-    S: ax::State,
+    E: fmt::Debug,
+    S: ax::State<E>,
     F: Fn(&S) -> i8,
 {
+    _e: PhantomData<E>,
     _d: PhantomData<S>,
     piece: P,
     max_depth: usize,
     hue: F,
 }
 
-impl<P, S, F> Negamax<P, S, F>
+impl<E, P, S, F> Negamax<P, E, S, F>
 where
     P: fmt::Display + PartialEq + Default + Copy,
-    S: ax::FiniteState,
+    E: fmt::Debug,
+    S: ax::FiniteState<E>,
     F: Fn(&S) -> i8,
 {
     /// Provide a max depth and hueristic for Negamax to use when scoring possible moves.
     pub fn with_hueristic(piece: P, max_depth: usize, f: F) -> Self {
         Self {
+            _e: PhantomData,
             _d: PhantomData,
             piece,
             max_depth,
@@ -34,7 +38,7 @@ where
     }
 
     fn negamax(&self, node: &S, depth: usize, color: i8) -> i8 {
-        if depth == 0 || node.status() == ax::Status::Terminal {
+        if depth == 0 || node.status().unwrap() == ax::Status::Terminal {
             return color * (self.hue)(node);
         }
 
@@ -48,10 +52,11 @@ where
     }
 }
 
-impl<S, P, F> ax::Player<S> for Negamax<P, S, F>
+impl<E, S, P, F> ax::Player<S> for Negamax<P, E, S, F>
 where
     P: fmt::Display + PartialEq + Default + Copy,
-    S: ax::FiniteState,
+    E: fmt::Debug,
+    S: ax::FiniteState<E>,
     F: Fn(&S) -> i8,
 {
     fn take_turn(&mut self, state: S) -> S {

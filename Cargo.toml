@@ -9,12 +9,10 @@ edition = "2018"
 [dependencies]
 rand = "0.8"
 clap = "3.0.0-beta"
-ax_derive = { path = "./ax_derive", version = "1" }
 
 [workspace]
 members = [
-  ".",
-  "ax_derive"
+  "."
 ]
 
 [profile.release]
