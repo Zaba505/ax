@@ -13,15 +13,6 @@ pub struct Board<P> {
     pieces: Vec<(usize, P)>,
 }
 
-impl<P> Board<P> {
-    pub fn with_empty(empty: P) -> Self {
-        Self {
-            def: empty,
-            pieces: Vec::with_capacity(9),
-        }
-    }
-}
-
 impl<P: Default> Board<P> {
     pub fn new() -> Self {
         Self {
@@ -113,23 +104,34 @@ where
     }
 }
 
-impl<P> ax::State for Board<P>
+impl<P> ax::AsBytes for Board<P>
 where
-    P: PartialEq + Default,
+    P: fmt::Display,
 {
-    fn status(&self) -> ax::Status {
-        let winner = self.is_winner(P::default());
-        if let Some(false) = winner {
-            return ax::Status::Terminal;
-        }
-        if !self.has_empty() {
-            return ax::Status::Terminal;
-        }
-        ax::Status::Valid
+    fn as_bytes(&self) -> Vec<u8> {
+        let mut s = String::new();
+        fmt::write(&mut s, format_args!("{}", self)).expect("unexpected error");
+        s.into_bytes()
     }
 }
 
-impl<P> ax::FiniteState for Board<P>
+impl<P> ax::State<()> for Board<P>
+where
+    P: PartialEq + Default,
+{
+    fn status(&self) -> Result<ax::Status, ()> {
+        let winner = self.is_winner(P::default());
+        if let Some(false) = winner {
+            return Ok(ax::Status::Terminal);
+        }
+        if !self.has_empty() {
+            return Ok(ax::Status::Terminal);
+        }
+        Ok(ax::Status::Valid)
+    }
+}
+
+impl<P> ax::FiniteState<()> for Board<P>
 where
     P: PartialEq + Default + Copy,
 {
@@ -169,10 +171,13 @@ impl<P> Index<usize> for Board<P> {
 }
 
 /// Human
-pub struct Human<'a>(pub &'a str);
+pub struct Human<P>(pub P);
 
-impl<'a> ax::Player<Board<&'a str>> for Human<'a> {
-    fn take_turn(&mut self, board: Board<&'a str>) -> Board<&'a str> {
+impl<P> ax::Player<Board<P>> for Human<P>
+where
+    P: fmt::Display + PartialEq + Default + Copy,
+{
+    fn take_turn(&mut self, board: Board<P>) -> Board<P> {
         let mut input = String::new();
 
         io::stdout()
@@ -222,7 +227,7 @@ where
     R: Rng,
 {
     fn take_turn(&mut self, board: Board<P>) -> Board<P> {
-        let pos = self.rng.borrow_mut().gen_range(0..8);
+        let pos = self.rng.borrow_mut().gen_range(0..9);
 
         let mut board = board;
         let res = board.place_piece(pos, self.piece);

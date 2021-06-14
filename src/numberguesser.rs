@@ -1,3 +1,4 @@
+use std::error;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -52,16 +53,38 @@ impl fmt::Display for State {
     }
 }
 
-impl ax::State for State {
-    fn status(&self) -> ax::Status {
-        let guess = self.guess.unwrap(); // TODO: self.guess == None => invalid state
-        if guess > self.number {
-            ax::Status::Valid
-        } else if guess < self.number {
-            ax::Status::Valid
-        } else {
-            ax::Status::Terminal
-        }
+impl ax::AsBytes for State {
+    fn as_bytes(&self) -> Vec<u8> {
+        let mut s = String::new();
+        fmt::write(&mut s, format_args!("{}", self)).expect("unexpected error");
+        s.into_bytes()
+    }
+}
+
+#[derive(Debug)]
+pub struct NoGuess;
+
+impl fmt::Display for NoGuess {
+    fn fmt(&self, _f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        todo!()
+    }
+}
+
+impl error::Error for NoGuess {}
+
+impl ax::State<NoGuess> for State {
+    fn status(&self) -> Result<ax::Status, NoGuess> {
+        self.guess
+            .and_then(|guess| {
+                if guess > self.number {
+                    Some(ax::Status::Valid)
+                } else if guess < self.number {
+                    Some(ax::Status::Valid)
+                } else {
+                    Some(ax::Status::Terminal)
+                }
+            })
+            .ok_or(NoGuess)
     }
 }
 
