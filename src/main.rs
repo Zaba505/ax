@@ -70,16 +70,21 @@ fn main() {
             }
             Some(("tic-tac-toe", args)) => {
                 let mode: &str = args.value_of("mode").unwrap();
+                let ais: Vec<&str> = args.values_of("ai").unwrap().collect();
 
                 let state: tictactoe::Board<&str> = tictactoe::Board::new();
 
                 let state = match mode {
                     "human-vs-ai" => {
-                        let mut run = play_tic_tac_toe(
-                            tictactoe::Human("X"),
-                            tictactoe::Random::new("O", rand::thread_rng()),
-                        );
+                        let human = tictactoe::Human("X");
 
+                        let mut run = match ais[0] {
+                            "random" => play_tic_tac_toe(
+                                human,
+                                tictactoe::Random::new("O", rand::thread_rng()),
+                            ),
+                            s => panic!("human-vs-ai: unsupported ai: {}", s),
+                        };
                         run.apply(state)
                     }
                     "human-vs-human" => {
