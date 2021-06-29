@@ -1,7 +1,6 @@
 use std::cell::RefCell;
 use std::fmt;
 use std::io::{self, Write};
-use std::ops::Index;
 
 use ax;
 
@@ -9,14 +8,12 @@ use rand::Rng;
 
 #[derive(Debug, PartialEq)]
 pub struct Board<P> {
-    def: P,
     pieces: Vec<(usize, P)>,
 }
 
-impl<P: Default> Board<P> {
+impl<P> Board<P> {
     pub fn new() -> Self {
         Self {
-            def: P::default(),
             pieces: Vec::with_capacity(9),
         }
     }
@@ -24,89 +21,184 @@ impl<P: Default> Board<P> {
 
 impl<P, U> From<U> for Board<P>
 where
-    P: Default,
     U: Into<Vec<(usize, P)>>,
 {
     fn from(pieces: U) -> Self {
-        Self {
-            def: P::default(),
-            pieces: pieces.into(),
-        }
+        let mut pieces: Vec<(usize, P)> = pieces.into();
+        pieces.sort_unstable_by(|(i, _), (j, _)| j.cmp(i));
+        Self { pieces }
     }
 }
 
 impl<P: PartialEq> Board<P> {
     pub fn is_winner(&self, piece: P) -> Option<bool> {
-        if self[0] == self[1] && self[1] == self[2] {
-            return Some(self[2] == piece);
+        if self.pieces.len() < 3 {
+            return None;
         }
-        if self[3] == self[4] && self[4] == self[5] {
-            return Some(self[5] == piece);
+        for i in 0..3 {
+            // rows
+            let a = self
+                .pieces
+                .iter()
+                .find(|(j, _)| *j == 3 * i)
+                .map(|(_, p)| p);
+            let b = self
+                .pieces
+                .iter()
+                .find(|(j, _)| *j == 3 * i + 1)
+                .map(|(_, p)| p);
+            let c = self
+                .pieces
+                .iter()
+                .find(|(j, _)| *j == 3 * i + 2)
+                .map(|(_, p)| p);
+
+            if a == b && b == c && c != None {
+                return c.map(|p| *p == piece);
+            }
+
+            // columns
+            let a = self.pieces.iter().find(|(j, _)| *j == i).map(|(_, p)| p);
+            let b = self
+                .pieces
+                .iter()
+                .find(|(j, _)| *j == i + 3)
+                .map(|(_, p)| p);
+            let c = self
+                .pieces
+                .iter()
+                .find(|(j, _)| *j == i + 6)
+                .map(|(_, p)| p);
+
+            if a == b && b == c && c != None {
+                return c.map(|p| *p == piece);
+            }
         }
-        if self[6] == self[7] && self[7] == self[8] {
-            return Some(self[8] == piece);
-        }
-        if self[0] == self[3] && self[3] == self[6] {
-            return Some(self[6] == piece);
-        }
-        if self[1] == self[4] && self[4] == self[7] {
-            return Some(self[7] == piece);
-        }
-        if self[2] == self[5] && self[5] == self[8] {
-            return Some(self[8] == piece);
-        }
-        if self[0] == self[4] && self[4] == self[8] {
-            return Some(self[8] == piece);
-        }
-        if self[2] == self[4] && self[4] == self[6] {
-            return Some(self[6] == piece);
+        for i in 0..2 {
+            let a = self
+                .pieces
+                .iter()
+                .find(|(j, _)| *j == i * 2)
+                .map(|(_, p)| p);
+            let b = self.pieces.iter().find(|(j, _)| *j == 4).map(|(_, p)| p);
+            let c = self
+                .pieces
+                .iter()
+                .find(|(j, _)| *j == 8 - 2 * i)
+                .map(|(_, p)| p);
+
+            if a == b && b == c && c != None {
+                return c.map(|p| *p == piece);
+            }
         }
         None
     }
 
     pub fn has_empty(&self) -> bool {
-        self[0] == self.def
-            || self[1] == self.def
-            || self[2] == self.def
-            || self[3] == self.def
-            || self[4] == self.def
-            || self[5] == self.def
-            || self[6] == self.def
-            || self[7] == self.def
-            || self[8] == self.def
+        return self.pieces.len() < 9;
     }
 
     pub fn place_piece(&mut self, index: usize, piece: P) -> Result<(), Error> {
+        let mut idx = 0;
         for (i, _) in &self.pieces {
             if *i == index {
                 return Err(Error::SpotOccupied);
             }
+            if index > *i {
+                break;
+            }
+            idx += 1;
         }
-        self.pieces.push((index, piece));
+        self.pieces.insert(idx, (index, piece));
         Ok(())
     }
 }
 
+#[derive(Debug, PartialEq)]
 pub enum Error {
     SpotOccupied,
 }
 
 impl<P> fmt::Display for Board<P>
 where
-    P: fmt::Display,
+    P: fmt::Display + Default,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        writeln!(f, "{} | {} | {}", self[0], self[1], self[2])?;
+        let a = &P::default();
+        let one = self
+            .pieces
+            .iter()
+            .find(|(j, _)| *j == 0)
+            .map(|(_, p)| p)
+            .or_else(|| Some(a))
+            .unwrap();
+        let two = self
+            .pieces
+            .iter()
+            .find(|(j, _)| *j == 1)
+            .map(|(_, p)| p)
+            .or_else(|| Some(a))
+            .unwrap();
+        let thr = self
+            .pieces
+            .iter()
+            .find(|(j, _)| *j == 2)
+            .map(|(_, p)| p)
+            .or_else(|| Some(a))
+            .unwrap();
+        let four = self
+            .pieces
+            .iter()
+            .find(|(j, _)| *j == 3)
+            .map(|(_, p)| p)
+            .or_else(|| Some(a))
+            .unwrap();
+        let five = self
+            .pieces
+            .iter()
+            .find(|(j, _)| *j == 4)
+            .map(|(_, p)| p)
+            .or_else(|| Some(a))
+            .unwrap();
+        let six = self
+            .pieces
+            .iter()
+            .find(|(j, _)| *j == 5)
+            .map(|(_, p)| p)
+            .or_else(|| Some(a))
+            .unwrap();
+        let seven = self
+            .pieces
+            .iter()
+            .find(|(j, _)| *j == 6)
+            .map(|(_, p)| p)
+            .or_else(|| Some(a))
+            .unwrap();
+        let eight = self
+            .pieces
+            .iter()
+            .find(|(j, _)| *j == 7)
+            .map(|(_, p)| p)
+            .or_else(|| Some(a))
+            .unwrap();
+        let nine = self
+            .pieces
+            .iter()
+            .find(|(j, _)| *j == 8)
+            .map(|(_, p)| p)
+            .or_else(|| Some(a))
+            .unwrap();
+        writeln!(f, "{} | {} | {}", one, two, thr)?;
         writeln!(f, "---------")?;
-        writeln!(f, "{} | {} | {}", self[3], self[4], self[5])?;
+        writeln!(f, "{} | {} | {}", four, five, six)?;
         writeln!(f, "---------")?;
-        writeln!(f, "{} | {} | {}", self[6], self[7], self[8])
+        writeln!(f, "{} | {} | {}", seven, eight, nine)
     }
 }
 
 impl<P> ax::AsBytes for Board<P>
 where
-    P: fmt::Display,
+    P: fmt::Display + Default,
 {
     fn as_bytes(&self) -> Vec<u8> {
         let mut s = String::new();
@@ -131,46 +223,77 @@ where
     }
 }
 
-impl<P> ax::FiniteState<()> for Board<P>
-where
-    P: PartialEq + Default + Copy,
-{
-    fn next_possibilities(&self) -> Option<Vec<Self>>
-    where
-        Self: Sized,
-    {
-        let next_piece = self.pieces[self.pieces.len() - 2].1;
-        Some(
-            self.pieces
-                .iter()
-                .map(|p| p.0)
-                .fold(vec![0, 1, 2, 3, 4, 5, 6, 7, 8], |acc, i| {
-                    acc.into_iter().filter(|n| i != *n).collect::<Vec<usize>>()
-                })
-                .iter()
-                .map(|i| {
-                    let mut v = Vec::with_capacity(9);
-                    v.push((*i, next_piece));
-                    v.extend(self.pieces.clone());
-                    Board::from(v)
-                })
-                .collect(),
-        )
+impl<P> IntoIterator for Board<P> {
+    // Option<P> avoids needing P: Default constraint.
+    type Item = Option<P>;
+    type IntoIter = Pieces<P>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Pieces {
+            pieces: self.pieces,
+            idx: 0,
+        }
     }
 }
 
-impl<P> Index<usize> for Board<P> {
-    type Output = P;
+#[derive(Debug)]
+pub struct Pieces<P> {
+    pieces: Vec<(usize, P)>,
+    idx: usize,
+}
 
-    fn index(&self, index: usize) -> &Self::Output {
-        if let Some(piece) = self.pieces.iter().find(|p| p.0 == index) {
-            return &piece.1;
+impl<P> Iterator for Pieces<P> {
+    // Option<P> avoids needing P: Default constraint.
+    type Item = Option<P>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.idx == 9 {
+            return None;
         }
-        &self.def
+        if self.pieces.len() == 0 && self.idx < 9 {
+            self.idx += 1;
+            return Some(None);
+        }
+        if self.idx == self.pieces[self.pieces.len() - 1].0 {
+            self.idx += 1;
+            return self.pieces.pop().map(|(_, p)| Some(p));
+        }
+        self.idx += 1;
+        return Some(None);
+    }
+}
+
+impl<'a, P> ax::FiniteState<()> for Board<P>
+where
+    P: PartialEq + Default + Copy,
+{
+    type Item = Board<P>;
+    type States = States<P>;
+
+    fn possible_states(mut self) -> Self::States
+    where
+        Self: Sized,
+    {
+        self.pieces.sort_unstable_by(|(i, _), (j, _)| i.cmp(j));
+        States { state: self }
+    }
+}
+
+#[derive(Debug)]
+pub struct States<P> {
+    state: Board<P>,
+}
+
+impl<P> Iterator for States<P> {
+    type Item = Board<P>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        todo!()
     }
 }
 
 /// Human
+#[derive(Debug)]
 pub struct Human<P>(pub P);
 
 impl<P> ax::Player<Board<P>> for Human<P>
@@ -235,5 +358,137 @@ where
             return self.take_turn(board);
         }
         board
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use rand;
+
+    #[test]
+    fn empty_pieces() {
+        let b: Board<&str> = Board::from(Vec::new());
+        let mut pieces = b.into_iter();
+
+        for i in 0..10 {
+            if i < 9 {
+                assert_eq!(Some(None), pieces.next());
+            } else {
+                assert_eq!(
+                    None,
+                    pieces.next(),
+                    "a tic-tac-toe board should only have 9 pieces!"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn sparse_pieces() {
+        let b = Board::from(vec![(0, "X"), (4, "X"), (8, "X")]);
+        let mut pieces = b.into_iter();
+
+        assert_eq!(Some(Some("X")), pieces.next(), "expected piece('X') at:  0");
+        for i in 0..3 {
+            assert_eq!(Some(None), pieces.next(), "expected no piece at: {}", i + 1);
+        }
+        assert_eq!(Some(Some("X")), pieces.next(), "expected piece('X') at: 4");
+        for i in 0..3 {
+            assert_eq!(Some(None), pieces.next(), "expected no piece at: {}", i + 4);
+        }
+        assert_eq!(Some(Some("X")), pieces.next(), "expected piece('X') at: 8");
+    }
+
+    #[test]
+    fn sparse_pieces_2() {
+        let b = Board::from(vec![(2, "X"), (4, "X"), (8, "X")]);
+        let mut pieces = b.into_iter();
+
+        for i in 0..2 {
+            assert_eq!(Some(None), pieces.next(), "expected no piece at: {}", i);
+        }
+        assert_eq!(Some(Some("X")), pieces.next(), "expected piece('X') at: 2");
+        assert_eq!(Some(None), pieces.next(), "expected no piece at: 3");
+        assert_eq!(Some(Some("X")), pieces.next(), "expected piece('X') at: 4");
+        for i in 0..3 {
+            assert_eq!(Some(None), pieces.next(), "expected no piece at: {}", i + 5);
+        }
+        assert_eq!(Some(Some("X")), pieces.next(), "expected piece('X') at: 8");
+    }
+
+    #[test]
+    fn place_piece() {
+        let mut b: Board<&str> = Board::new();
+
+        assert_eq!(Ok(()), b.place_piece(1, "X"));
+        assert_eq!(Ok(()), b.place_piece(0, "X"));
+    }
+
+    #[test]
+    fn place_piece_random_order() {
+        let mut r = rand::thread_rng();
+        let i = r.gen_range(0..9);
+        let j = loop {
+            let n = r.gen_range(0..9);
+            if n != i {
+                break n;
+            }
+        };
+        let k = loop {
+            let n = r.gen_range(0..9);
+            if n != i && n != j {
+                break n;
+            }
+        };
+        let mut b: Board<&str> = Board::new();
+
+        assert_eq!(Ok(()), b.place_piece(i, "X"));
+        assert_eq!(Ok(()), b.place_piece(j, "X"));
+        assert_eq!(Ok(()), b.place_piece(k, "X"));
+    }
+
+    #[test]
+    fn place_piece_on_occupied_spot() {
+        let mut b: Board<&str> = Board::new();
+
+        assert_eq!(Ok(()), b.place_piece(0, "X"));
+        assert_eq!(Err(Error::SpotOccupied), b.place_piece(0, "X"));
+    }
+
+    #[test]
+    fn is_winner() {
+        let possibilities = vec![
+            (0, 1, 2),
+            (3, 4, 5),
+            (6, 7, 8),
+            (0, 3, 6),
+            (1, 4, 7),
+            (2, 5, 8),
+            (6, 7, 8),
+            (0, 4, 8),
+            (2, 4, 6),
+        ];
+        for pos in possibilities {
+            let mut b = Board::new();
+
+            b.place_piece(pos.0, "X").expect("");
+            b.place_piece(pos.1, "X").expect("");
+            b.place_piece(pos.2, "X").expect("");
+
+            assert_eq!(
+                Some(true),
+                b.is_winner("X"),
+                "expected winner for combo: {:?}",
+                pos
+            );
+        }
+    }
+
+    #[test]
+    fn is_not_winner() {
+        let b = Board::from(vec![(0, "X"), (3, "X"), (6, "X")]);
+
+        assert_eq!(Some(false), b.is_winner("O"));
     }
 }
