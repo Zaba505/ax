@@ -4,6 +4,7 @@ mod tictactoe;
 
 use std::io;
 
+use ax::ai;
 use ax::combinator::{
     enumerate_action, if_then_else, map_action, map_err, map_result, render, repeat_until_terminal,
     take_turn, Either,
@@ -78,14 +79,36 @@ fn main() {
                     "human-vs-ai" => {
                         let human = tictactoe::Human("X");
 
-                        let mut run = match ais[0] {
-                            "random" => play_tic_tac_toe(
-                                human,
-                                tictactoe::Random::new("O", rand::thread_rng()),
-                            ),
+                        match ais[0] {
+                            "random" => {
+                                let mut run = play_tic_tac_toe(
+                                    human,
+                                    tictactoe::Random::new("O", rand::thread_rng()),
+                                );
+
+                                run.apply(state)
+                            }
+                            "negamax" => {
+                                let mut run = play_tic_tac_toe(
+                                    human,
+                                    ai::Negamax::with_hueristic(
+                                        "O",
+                                        usize::MAX,
+                                        |state: &tictactoe::Board<&str>| match state.is_winner("O")
+                                        {
+                                            Some(true) => 1,
+                                            Some(false) => -1,
+                                            None => {
+                                                panic!("negamax: expected state to be terminal")
+                                            }
+                                        },
+                                    ),
+                                );
+
+                                run.apply(state)
+                            }
                             s => panic!("human-vs-ai: unsupported ai: {}", s),
-                        };
-                        run.apply(state)
+                        }
                     }
                     "human-vs-human" => {
                         let mut run =
