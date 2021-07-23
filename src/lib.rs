@@ -71,7 +71,10 @@ where
 
 /// FiniteState
 pub trait FiniteState<E>: State<E> {
-    fn next_possibilities(&self) -> Option<Vec<Self>>
+    type Item;
+    type States: Iterator<Item = Self::Item>;
+
+    fn possible_states(self) -> Self::States
     where
         Self: Sized;
 }
